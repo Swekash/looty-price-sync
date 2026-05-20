@@ -110,13 +110,9 @@ def main():
                     listing = item.offers_v2.listings[0]
                     new_price = clean_price(listing.price.money.amount)
                 
-                # Check conditions and update
-                if new_price == 0:
-                    rows[row_idx][idx_price] = "0"
-                    rows[row_idx][idx_updated] = today_str
-                    updated_count += 1
-                elif new_price != old_price:
-                    # Check for massive drop
+                # Check conditions and update (SAFE MODE)
+                if new_price > 0 and new_price != old_price:
+                    # We got a valid new price! Check for massive drop
                     if old_price > 0:
                         drop_ratio = (old_price - new_price) / old_price
                         if drop_ratio >= ALERT_DROP_THRESHOLD:
@@ -125,6 +121,10 @@ def main():
                     rows[row_idx][idx_price] = str(new_price)
                     rows[row_idx][idx_updated] = today_str
                     updated_count += 1
+                elif new_price == 0:
+                    # API returned nothing or item is out of stock. 
+                    # Do NOTHING to protect the existing spreadsheet data.
+                    log.warning(f"No price found for ASIN {asin}. Leaving old price intact.")
                     
         except Exception as e:
             log.error(f"Failed to fetch batch {batch_asins}: {e}")
@@ -138,7 +138,7 @@ def main():
         ws.update(values=[headers] + rows, range_name=f"A1:{chr(65+len(headers)-1)}{len(rows)+1}")
         log.info("Sheet updated successfully.")
     else:
-        log.info("No prices changed.")
+        log.info("No prices changed. Sheet remains untouched.")
 
 if __name__ == "__main__":
     main()
